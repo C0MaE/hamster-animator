@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# rendered output
+animations/
+*.mp4
+*.webm
+*.mov
+!docs/assets/*
+
+# editors
+.idea/
+.vscode/
