@@ -24,7 +24,6 @@ import math
 import sys
 
 import numpy as np
-from _trailer import run
 
 import hamster_animator as ha
 from hamster_animator.camera import EASINGS
@@ -121,8 +120,8 @@ def lab(param: str, values, inclination: float, azimuth: float) -> tuple:
     return scene, camera
 
 
-def acts(sim: ha.Sim, cache) -> list[tuple[str, ha.Animation, ha.Style]]:
-    A = lambda scene, camera, **kw: ha.Animation(scene, camera, sim=sim, cache=cache, **kw)
+def acts(sim: ha.Sim) -> list[tuple[str, ha.Animation, ha.Style]]:
+    A = lambda scene, camera, **kw: ha.Animation(scene, camera, sim=sim, **kw)
     approach, orbit, zoom, planet, edge_on = flight()
     to_mm = ha.Steps([1.6e-6, 10e-6, 870e-6], hold=24, fade=36)
     beta = lab("beta", np.round(np.linspace(1.05, 1.32, 10), 2), inclination=55, azimuth=0)
@@ -142,4 +141,4 @@ def acts(sim: ha.Sim, cache) -> list[tuple[str, ha.Animation, ha.Style]]:
 
 
 if __name__ == "__main__":
-    sys.exit(run(acts, SIM, "journey", FPS))
+    sys.exit(ha.Sequence(acts(SIM), fps=FPS).cli("journey"))

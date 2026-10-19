@@ -15,6 +15,7 @@ from .animation import Animation, Frame
 from .camera import Camera, FixedPath, Path, View
 from .render import QUANTITIES, STYLES, Stretch, Style
 from .scene import Clump, Disk, Gap, Planet, Spiral, Warp, presets
+from .sequence import Act, Sequence
 from .sim import Cache, Local, Plan, Sim, Slurm, Star
 from .steps import Mix, Steps
 
@@ -23,6 +24,7 @@ __version__ = "0.1.0"
 __all__ = [
     "QUANTITIES",
     "STYLES",
+    "Act",
     "Animation",
     "Cache",
     "Camera",
@@ -36,6 +38,7 @@ __all__ = [
     "Path",
     "Plan",
     "Planet",
+    "Sequence",
     "Sim",
     "Slurm",
     "Spiral",

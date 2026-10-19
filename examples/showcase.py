@@ -17,13 +17,13 @@ for free. The plan printed at the start shows how few HAMSTER detectors the
     python examples/showcase.py --slurm --partition long
     python examples/showcase.py --slurm --partition long   # again once the jobs are done → video
 
-Output: ``animations/showcase/showcase.mp4``, one video and one still (for slides) per act.
+Output: ``animations/showcase/final/showcase.mp4``, the single acts in ``showcase_acts/``
+and one still per act (for slides) in ``stills/``.
 """
 
 import sys
 
 import numpy as np
-from _trailer import run
 
 import hamster_animator as ha
 
@@ -63,10 +63,10 @@ RGB = ha.Style(
 )
 
 
-def acts(sim: ha.Sim, cache) -> list[tuple[str, ha.Animation, ha.Style]]:
-    """(name, animation, style) for every act. All acts share the sim settings and the cache."""
+def acts(sim: ha.Sim) -> list[tuple[str, ha.Animation, ha.Style]]:
+    """(name, animation, style) for every act. All acts share the sim settings."""
     orbit = ha.Camera.orbit(inclination=50, frames=ORBIT, fov=FOV)
-    A = lambda scene, camera, **kw: ha.Animation(scene, camera, sim=sim, cache=cache, **kw)
+    A = lambda scene, camera, **kw: ha.Animation(scene, camera, sim=sim, **kw)
 
     # the field of view shrinks, so the flux per pixel changes: normalise every frame on its own
     approach = ha.Camera.move(72, inclination=(10, 50), azimuth=(-120, 0), fov=(1400, FOV), ease="out")
@@ -110,4 +110,4 @@ def acts(sim: ha.Sim, cache) -> list[tuple[str, ha.Animation, ha.Style]]:
 
 
 if __name__ == "__main__":
-    sys.exit(run(acts, SIM, "showcase", FPS))
+    sys.exit(ha.Sequence(acts(SIM), fps=FPS).cli("showcase"))
