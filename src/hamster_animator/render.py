@@ -406,6 +406,11 @@ class Canvas:
         self.fig.canvas.draw()
         return np.asarray(self.fig.canvas.buffer_rgba())[..., :3].tobytes()
 
+    def close(self) -> None:
+        import matplotlib.pyplot as plt
+
+        plt.close(self.fig)
+
 
 _WORKER: dict = {}
 
@@ -421,8 +426,11 @@ def draw_frames(frames: list[FrameData], style: Style, workers: int | None = Non
     workers = workers or min(len(frames), os.cpu_count() or 1)
     if workers <= 1 or len(frames) < 4 or "fork" not in mp.get_all_start_methods():
         canvas = Canvas(style)
-        for fd in frames:
-            yield canvas.draw(fd)
+        try:
+            for fd in frames:
+                yield canvas.draw(fd)
+        finally:
+            canvas.close()
         return
     _WORKER.clear()
     _WORKER.update(style=style, frames=frames)
@@ -502,3 +510,21 @@ def write_video(chunks, path, style: Style, fps: int, quality: int = 18, gif_wid
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg failed (exit {proc.returncode})")
     return path
+
+
+def concat_videos(paths, out) -> Path:
+    """Join videos with identical encoding settings (e.g. from ``write_video``) without re-encoding."""
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg not found – it is needed to join videos.")
+    listing = out.with_name(out.name + ".txt")
+    listing.write_text("".join(f"file '{Path(p).resolve()}'\n" for p in paths))
+    try:
+        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy"]
+        res = subprocess.run([*cmd, str(out)])
+    finally:
+        listing.unlink(missing_ok=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed to join the videos (exit {res.returncode})")
+    return out

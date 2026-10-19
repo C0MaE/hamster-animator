@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `Sequence`: several animations planned together (shared views are simulated once with all wavelengths),
+  joined into one video without re-encoding, with stills per act and a ready-made command line (`.cli()`)
+  including `--check` and protection against submitting SLURM jobs twice
+- examples `showcase.py` (seven-act trailer) and `journey.py` (zoom onto a planet, parameter sweeps)
+
 ## 0.1.0
 
 First release.

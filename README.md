@@ -25,6 +25,7 @@ anim.save("orbit.mp4", style="cinematic")        # final quality
 - **Wavelength journeys** with cross-fades, and **RGB composites** from three wavelengths
 - **Polarisation**: I, Q, U, V, PI, polarisation degree, Q_φ/U_φ, polarisation vectors
 - **Parameter evolution**: sweep any disk or structure parameter; steps are cross-faded
+- **Sequences**: several animations planned together and joined into one video, with a ready-made command line
 - **Disk models**: Shakura-Sunyaev disk with spirals, gaps, planets, clumps/vortices and warps
 - **Efficient**: views are de-duplicated, wavelengths and Stokes come from the same run, results are cached per view and wavelength
 - **Local or SLURM**, output to MP4, WebM, GIF, ProRes or PNG sequences
@@ -123,6 +124,32 @@ The most useful options:
 
 Handy for tuning: `anim.still("look.png", frame=10, style=...)` and `anim.contact_sheet("sheet.png")`.
 Re-rendering never re-runs HAMSTER.
+
+### Sequences
+
+A `Sequence` plays several animations ("acts") one after another, each with its own camera, tracks and style.
+All acts are planned **together**: a view that several acts use is simulated once, with every wavelength any
+of them needs. So an orbit at 1.6 µm, the same orbit as an RGB composite and again in polarised light cost
+the same detectors as a single orbit.
+
+```python
+orbit = ha.Camera.orbit(inclination=50, frames=144)
+seq = ha.Sequence([
+    ("orbit", ha.Animation(disk, orbit, wavelength=1.6e-6, sim=sim), "cinematic"),
+    ("rgb", ha.Animation(disk, orbit.reverse(), wavelength=(2.2e-6, 1.6e-6, 1.25e-6), sim=sim), "cinematic"),
+    ("pi", ha.Animation(disk, orbit, wavelength=1.6e-6, quantity="PI", sim=sim), "polarimetry"),
+], fps=24)
+
+print(seq.summary())          # frames, plan and what joint planning saves
+seq.save("trailer.mp4")       # one video; the single acts are kept in trailer_acts/
+seq.stills("slides/")         # one PNG per act
+```
+
+All acts need the same `Sim` and output size. For a script, `seq.cli("trailer")` adds a command line with
+`--plan`, `--check` (draft stills of the first, middle and last frame of every act), `--draft` and
+`--slurm --partition … --cpus … --setup "module load gcc"`. While SLURM jobs are still running, a second
+call does not submit them again. Complete trailers are in [`examples/showcase.py`](examples/showcase.py)
+and [`examples/journey.py`](examples/journey.py) (a zoom that follows a planet, plus parameter sweeps).
 
 ## Performance
 
