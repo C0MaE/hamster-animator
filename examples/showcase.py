@@ -12,6 +12,7 @@ for free. The plan printed at the start shows how few HAMSTER detectors the
 876 frames actually need.
 
     python examples/showcase.py --plan              # what would be computed (no HAMSTER needed)
+    python examples/showcase.py --check             # draft stills of the key frames
     python examples/showcase.py --draft             # preview on a laptop (10x fewer photons)
     python examples/showcase.py --slurm --partition long
     python examples/showcase.py --slurm --partition long   # again once the jobs are done → video
@@ -19,17 +20,12 @@ for free. The plan printed at the start shows how few HAMSTER detectors the
 Output: ``animations/showcase/showcase.mp4``, one video and one still (for slides) per act.
 """
 
-import argparse
-import shutil
-import subprocess
 import sys
-from pathlib import Path
 
 import numpy as np
+from _trailer import run
 
 import hamster_animator as ha
-from hamster_animator.animation import default_cache
-from hamster_animator.sim import collect, make_plan
 
 FPS = 24
 FOV = 500.0  # au, the whole disk
@@ -72,6 +68,7 @@ def acts(sim: ha.Sim, cache) -> list[tuple[str, ha.Animation, ha.Style]]:
     orbit = ha.Camera.orbit(inclination=50, frames=ORBIT, fov=FOV)
     A = lambda scene, camera, **kw: ha.Animation(scene, camera, sim=sim, cache=cache, **kw)
 
+    # the field of view shrinks, so the flux per pixel changes: normalise every frame on its own
     approach = ha.Camera.move(72, inclination=(10, 50), azimuth=(-120, 0), fov=(1400, FOV), ease="out")
     spectrum = ha.Steps([0.55e-6, 1.25e-6, 2.2e-6, 10e-6, 870e-6], hold=16, fade=16)
     quantity = ha.Steps(["I", "PI", "Q_PHI"], hold=32, fade=24)
@@ -82,7 +79,7 @@ def acts(sim: ha.Sim, cache) -> list[tuple[str, ha.Animation, ha.Style]]:
         .then(ha.Camera.still(24))
     )
     return [
-        ("1_approach", A(DISK, approach, wavelength=1.6e-6), CINEMATIC.with_(title="Anflug")),
+        ("1_approach", A(DISK, approach, wavelength=1.6e-6), CINEMATIC.with_(title="Anflug", norm="frame")),
         ("2_orbit", A(DISK, orbit, wavelength=1.6e-6), CINEMATIC.with_(title="Eine Umrundung")),
         (
             "3_spectrum",
@@ -112,75 +109,5 @@ def acts(sim: ha.Sim, cache) -> list[tuple[str, ha.Animation, ha.Style]]:
     ]
 
 
-def plan_all(show, backend):
-    """One plan for all acts: views shared between acts are simulated once, with all their wavelengths."""
-    anim = show[0][1]
-    collect(anim.cache)
-    requests = [r for _, a, _ in show for r in a._requests(a.frames())]
-    return make_plan(requests, anim.sim, anim.cache, getattr(backend, "views_per_job", None))
-
-
-def concat(videos, out: Path) -> Path:
-    listing = out.with_suffix(".txt")
-    listing.write_text("".join(f"file '{v.resolve()}'\n" for v in videos))
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy"]
-    subprocess.run([*cmd, str(out)], check=True)
-    listing.unlink()
-    return out
-
-
-def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--plan", action="store_true", help="only show what would be computed")
-    ap.add_argument("--draft", action="store_true", help="10x fewer photons, half resolution")
-    ap.add_argument("--out", default="animations/showcase")
-    ap.add_argument("--slurm", action="store_true", help="submit to SLURM instead of running locally")
-    ap.add_argument("--partition", default=None)
-    ap.add_argument("--views-per-job", type=int, default=6)
-    ap.add_argument("--cpus", type=int, default=32)
-    ap.add_argument("--resubmit", action="store_true", help="submit even though earlier runs are still pending")
-    args = ap.parse_args(argv)
-
-    sim = SIM.draft() if args.draft else SIM
-    show = acts(sim, ha.Cache(default_cache()))
-    cache = show[0][1].cache
-    if args.slurm:
-        backend = ha.Slurm(partition=args.partition, cpus=args.cpus, views_per_job=args.views_per_job)
-    else:
-        backend = ha.Local()
-
-    plan = plan_all(show, backend)
-    n_frames = sum(len(a) for _, a, _ in show)
-    print(f"\n{n_frames} frames in {len(show)} acts ({n_frames / FPS:.0f} s at {FPS} fps)")
-    print(plan)
-    if plan.cached == 0:
-        separately = sum(a.plan(backend).n_detectors for _, a, _ in show)
-        print(f"→ {plan.n_detectors} HAMSTER detector(s) for {n_frames} frames ({separately} if planned per act)\n")
-    if args.plan:
-        return 0
-
-    if not plan.empty:
-        # Pending runs are not part of the plan, so a second call while SLURM jobs are
-        # still running would submit everything again.
-        if any((cache.root / "runs").glob("*/manifest.json")) and not args.resubmit:
-            print("Earlier runs are still pending (check `squeue -u $USER`). Call again once they are done,")
-            print("or pass --resubmit if they failed.")
-            return 1
-        if not backend.execute(plan, cache):
-            print("Jobs submitted. Run this script again once they are done to render the video.")
-            return 0
-
-    out = Path(args.out) / ("draft" if args.draft else "final")
-    videos = []
-    for name, anim, style in show:
-        videos.append(anim.save(out / f"{name}.mp4", fps=FPS, style=style))
-        anim.still(out / "stills" / f"{name}.png", frame=len(anim) // 2, style=style)
-    final = concat(videos, out / "showcase.mp4")
-    print(f"\n✓ {final}  (stills for slides: {out / 'stills'})")
-    return 0
-
-
 if __name__ == "__main__":
-    if not shutil.which("ffmpeg") and "--plan" not in sys.argv:
-        sys.exit("ffmpeg not found – it is needed for the videos (brew install ffmpeg / module load ffmpeg).")
-    sys.exit(main())
+    sys.exit(run(acts, SIM, "showcase", FPS))
