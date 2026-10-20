@@ -1,7 +1,7 @@
 """
-Showcase: a ~37 s trailer.
-    python examples/showcase.py --plan              # what would be computed (no HAMSTER needed)
-    python examples/showcase.py --check             # draft stills of the key frames
+~37s trailer:
+    python examples/showcase.py --plan              # planed animation (no HAMSTER)
+    python examples/showcase.py --check             # drafts the key frames
     python examples/showcase.py --draft             # 10x less photons
     python examples/showcase.py --slurm --partition long
     python examples/showcase.py --slurm --partition long   # a second time for creating video
