@@ -1,7 +1,7 @@
 """
-Showcase: a ~37 s trailer.
-    python examples/showcase.py --plan              # what would be computed (no HAMSTER needed)
-    python examples/showcase.py --check             # draft stills of the key frames
+~37s trailer:
+    python examples/showcase.py --plan              # planed animation (no HAMSTER)
+    python examples/showcase.py --check             # drafts the key frames
     python examples/showcase.py --draft             # 10x less photons
     python examples/showcase.py --slurm --partition long
     python examples/showcase.py --slurm --partition long   # a second time for creating video
@@ -73,12 +73,12 @@ def acts(sim: ha.Sim) -> list[tuple[str, ha.Animation, ha.Style]]:
         (
             "4_rgb",
             A(DISK, orbit.reverse(), wavelength=(2.2e-6, 1.6e-6, 1.25e-6)),
-            RGB.with_(title="Falschfarben  J · H · K"),
+            RGB.with_(title="Falschfarben  J - H - K"),
         ),
         (
             "5_polarimetry",
             A(DISK, orbit, wavelength=1.25e-6, quantity=quantity),
-            ha.STYLES["polarimetry"].with_(title="Polarimetrie  I → PI → Q_φ", vignette=0.3, font_size=17),
+            ha.STYLES["polarimetry"].with_(title="Polarimetrie  I -> PI -> Q_phi", vignette=0.3, font_size=17),
         ),
         (
             "6_planet",
