@@ -1,24 +1,10 @@
 """
-Showcase: a ~37 s trailer in seven acts, made for presentations.
-
-One structured disk (spiral arms, a planet with gap and wake, a vortex and a
-warped inner disk) is shown in seven acts: approach, orbit, a journey through
-the spectrum, a J/H/K false-colour composite, polarimetry, a planet moving on
-its orbit and a tilt to edge-on.
-
-All acts are planned *together*. Acts 2-5 fly the same orbit, so every orbit
-view is simulated once with all six wavelengths, and RGB and polarimetry come
-for free. The plan printed at the start shows how few HAMSTER detectors the
-876 frames actually need.
-
+Showcase: a ~37 s trailer.
     python examples/showcase.py --plan              # what would be computed (no HAMSTER needed)
     python examples/showcase.py --check             # draft stills of the key frames
-    python examples/showcase.py --draft             # preview on a laptop (10x fewer photons)
+    python examples/showcase.py --draft             # 10x less photons
     python examples/showcase.py --slurm --partition long
-    python examples/showcase.py --slurm --partition long   # again once the jobs are done → video
-
-Output: ``animations/showcase/final/showcase.mp4``, the single acts in ``showcase_acts/``
-and one still per act (for slides) in ``stills/``.
+    python examples/showcase.py --slurm --partition long   # a second time for creating video
 """
 
 import sys
@@ -28,7 +14,7 @@ import numpy as np
 import hamster_animator as ha
 
 FPS = 24
-FOV = 500.0  # au, the whole disk
+FOV = 500.0
 ORBIT = 144  # frames of one orbit (6 s)
 
 DISK = ha.Disk(
@@ -64,11 +50,9 @@ RGB = ha.Style(
 
 
 def acts(sim: ha.Sim) -> list[tuple[str, ha.Animation, ha.Style]]:
-    """(name, animation, style) for every act. All acts share the sim settings."""
     orbit = ha.Camera.orbit(inclination=50, frames=ORBIT, fov=FOV)
     A = lambda scene, camera, **kw: ha.Animation(scene, camera, sim=sim, **kw)
 
-    # the field of view shrinks, so the flux per pixel changes: normalise every frame on its own
     approach = ha.Camera.move(72, inclination=(10, 50), azimuth=(-120, 0), fov=(1400, FOV), ease="out")
     spectrum = ha.Steps([0.55e-6, 1.25e-6, 2.2e-6, 10e-6, 870e-6], hold=16, fade=16)
     quantity = ha.Steps(["I", "PI", "Q_PHI"], hold=32, fade=24)
