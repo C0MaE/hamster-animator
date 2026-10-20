@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import logging
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from . import render as R
@@ -106,10 +106,13 @@ class Sequence:
             return True
         log.info("%s", plan)
         if self.pending() and not resubmit:
-            log.warning(
-                "earlier runs are still pending (check `squeue -u $USER`) – call again once they are done, "
-                "or pass resubmit=True if they failed"
-            )
+            if isinstance(backend, Slurm) and not backend.submit:
+                log.warning("earlier SLURM scripts are pending – submit them manually or pass --resubmit to write new scripts")
+            else:
+                log.warning(
+                    "earlier runs are still pending (check `squeue -u $USER`) – call again once they are done, "
+                    "or pass resubmit=True if they failed"
+                )
             return False
         return (backend or Local()).execute(plan, self.cache)
 
@@ -164,7 +167,7 @@ class Sequence:
         ]
 
     # ── command line ──
-    def cli(self, name: str, argv=None) -> int:
+    def cli(self, name: str, argv=None, slurm_backend: Slurm | None = None) -> int:
         """
         A ready-made command line for a script that builds a Sequence::
 
@@ -172,20 +175,21 @@ class Sequence:
                 sys.exit(ha.Sequence(acts(SIM)).cli("trailer"))
 
         ``--plan`` shows what would be computed, ``--check`` renders draft stills of the key frames,
-        ``--draft`` a preview, ``--slurm`` submits to SLURM (run the same command again when done).
+        ``--draft`` a preview, ``--slurm`` uses SLURM (run the same command again when done).
+        Pass ``slurm_backend`` to provide SLURM defaults, including ``submit=False`` for manual submission.
         """
         ap = argparse.ArgumentParser(description=f"Render the '{name}' sequence.")
         ap.add_argument("--plan", action="store_true", help="only show what would be computed")
         ap.add_argument("--draft", action="store_true", help="10x fewer photons, half resolution")
         ap.add_argument("--check", action="store_true", help="draft stills of the first, middle and last frame per act")
         ap.add_argument("--out", default=f"animations/{name}", help="output folder (default: %(default)s)")
-        ap.add_argument("--slurm", action="store_true", help="submit to SLURM instead of running locally")
-        ap.add_argument("--partition", default=None)
-        ap.add_argument("--time", default="12:00:00", help="SLURM time limit per array element")
-        ap.add_argument("--cpus", type=int, default=32)
-        ap.add_argument("--views-per-job", type=int, default=6)
+        ap.add_argument("--slurm", action="store_true", help="use SLURM instead of running locally")
+        ap.add_argument("--partition", default=slurm_backend.partition if slurm_backend else None)
+        ap.add_argument("--time", default=slurm_backend.time if slurm_backend else "12:00:00", help="SLURM time limit per array element")
+        ap.add_argument("--cpus", type=int, default=slurm_backend.cpus if slurm_backend else 32)
+        ap.add_argument("--views-per-job", type=int, default=slurm_backend.views_per_job if slurm_backend else 6)
         ap.add_argument(
-            "--setup", action="append", default=[], help="shell line before HAMSTER, e.g. 'module load gcc'"
+            "--setup", action="append", default=list(slurm_backend.setup) if slurm_backend else [], help="shell line before HAMSTER, e.g. 'module load gcc'"
         )
         ap.add_argument("--resubmit", action="store_true", help="submit even though earlier runs are still pending")
         args = ap.parse_args(argv)
@@ -197,13 +201,8 @@ class Sequence:
         if args.check:
             seq = seq.key_frames()
         if args.slurm:
-            backend = Slurm(
-                partition=args.partition,
-                time=args.time,
-                cpus=args.cpus,
-                views_per_job=args.views_per_job,
-                setup=args.setup,
-            )
+            settings = dict(partition=args.partition, time=args.time, cpus=args.cpus, views_per_job=args.views_per_job, setup=args.setup)
+            backend = replace(slurm_backend, **settings) if slurm_backend else Slurm(**settings)
         else:
             backend = Local()
 
@@ -213,6 +212,18 @@ class Sequence:
         if not seq.simulate(backend, args.resubmit):
             if not seq.pending():
                 return 1
+            if args.slurm and not backend.submit:
+                for manifest in sorted((seq.cache.root / "runs").glob("*/manifest.json")):
+                    run_dir = manifest.parent
+                    heat_script = run_dir / "heat.sh"
+                    scat_script = run_dir / "scat.sh"
+                    if not scat_script.exists():
+                        continue
+                    if heat_script.exists():
+                        print(f"heat_job=$(sbatch --parsable {heat_script})")
+                        print(f"sbatch --dependency=afterok:$heat_job {scat_script}")
+                    else:
+                        print(f"sbatch {scat_script}")
             print("Run the same command again once the jobs are done.")
             return 0
         out = Path(args.out) / ("check" if args.check else "draft" if args.draft else "final")

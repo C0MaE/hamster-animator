@@ -3,8 +3,8 @@
     python examples/showcase.py --plan              # planed animation (no HAMSTER)
     python examples/showcase.py --check             # drafts the key frames
     python examples/showcase.py --draft             # 10x less photons
-    python examples/showcase.py --slurm --partition long
-    python examples/showcase.py --slurm --partition long   # a second time for creating video
+    python examples/showcase.py --slurm           # write SLURM scripts; submit them manually as printed
+    python examples/showcase.py --slurm           # run again after the jobs finish to create the video
 """
 
 import sys
@@ -93,5 +93,13 @@ def acts(sim: ha.Sim) -> list[tuple[str, ha.Animation, ha.Style]]:
     ]
 
 
+backend = ha.Slurm(
+    partition="wolf-xl",
+    time="21-00:00:00",
+    cpus=140,
+    views_per_job=24,
+    submit=False,
+)
+
 if __name__ == "__main__":
-    sys.exit(ha.Sequence(acts(SIM), fps=FPS).cli("showcase"))
+    sys.exit(ha.Sequence(acts(SIM), fps=FPS).cli("showcase", slurm_backend=backend))

@@ -537,8 +537,14 @@ class Slurm:
         if not self.submit:
             log.info("SLURM scripts written (not submitted): %s", run_dir)
             return False
-        dep = self._sbatch(heat_script) if heat_script else None
-        jid = self._sbatch(scat_script, dep)
+        dep = None
+        try:
+            dep = self._sbatch(heat_script) if heat_script else None
+            jid = self._sbatch(scat_script, dep)
+        except (OSError, subprocess.CalledProcessError):
+            if dep is None:
+                (run_dir / "manifest.json").rename(run_dir / "manifest.json.stale")
+            raise
         log.info(
             "submitted %d heating and %d scattering array element(s) (job %s%s). Run save() again when they are done.",
             len(plan.heat),
